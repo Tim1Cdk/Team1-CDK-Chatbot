@@ -1,0 +1,6 @@
+openai
+tiktoken
+requests
+python-dotenv
+streamlit
+# dotenv
