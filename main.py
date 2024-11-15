@@ -26,7 +26,7 @@ class ConversationManager:
         self.max_tokens = max_tokens if max_tokens else DEFAULT_MAX_TOKENS
         self.token_budget = token_budget if token_budget else DEFAULT_TOKEN_BUDGET
 
-        self.system_message = "You are a friendly and supportive guide. You answer questions with kindness, encouragement, and patience, always looking to help the user feel comfortable and confident."  # Default persona
+        self.system_message = "Present yourself as Scientia, a chatbot that is friendly and supportive. You answer questions with kindness, encouragement, and patience, always looking to help the user feel comfortable and confident."  # Default persona
         self.conversation_history = [{"role": "system", "content": self.system_message}]
 
     def count_tokens(self, text):
@@ -100,8 +100,13 @@ def get_instance_id():
     except requests.exceptions.RequestException:
         return "Instance ID not available (running locally or error in retrieval)"
 
+# Function to initialize the conversation with a greeting message
+def initialize_conversation():
+    assistant_message = "Hi There! It's Scientia, your knowledge enlightment assistant. How may I help you?"
+    return [{"role": "assistant", "content": assistant_message}]
+
 ### Streamlit code ###
-st.title("AI Chatbot")
+st.title("Scientia")
 
 # Display EC2 Instance ID
 instance_id = get_instance_id()
@@ -113,13 +118,16 @@ if 'chat_manager' not in st.session_state:
 
 chat_manager = st.session_state['chat_manager']
 
+# Initialize conversation history with a greeting message from the assistant
 if 'conversation_history' not in st.session_state:
     st.session_state['conversation_history'] = chat_manager.conversation_history
+    # Add the initial assistant message to greet the user
+    st.session_state['conversation_history'] += initialize_conversation()
 
 conversation_history = st.session_state['conversation_history']
 
 # Chat input from the user
-user_input = st.chat_input("Write a message")
+user_input = st.chat_input("Ask me questions!")
 
 # Call the chat manager to get a response from the AI
 if user_input:
@@ -128,5 +136,8 @@ if user_input:
 # Display the conversation history
 for message in conversation_history:
     if message["role"] != "system":
-        with st.chat_message(message["role"]):
+        # Set avatar image based on role
+        avatar_image = "media/avatar_user.png" if message["role"] == "assistant" else "media/avatar_chatbot.png"
+        # Display message with avatar
+        with st.chat_message(message["role"], avatar=avatar_image):
             st.write(message["content"])
