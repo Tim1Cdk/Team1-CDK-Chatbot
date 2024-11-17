@@ -102,21 +102,60 @@ def get_instance_id():
 
 # Function to initialize the conversation with a greeting message
 def initialize_conversation():
-    assistant_message = "Hi There! It's Scientia, your knowledge enlightment assistant. How may I help you?"
+    assistant_message = "Hi there! It's Scientia, your knowledge enlightenment assistant. How may I help you?"
     return [{"role": "assistant", "content": assistant_message}]
 
 ### Streamlit code ###
 st.title("Scientia")
-
-# Display EC2 Instance ID
-instance_id = get_instance_id()
-st.write(f"**EC2 Instance ID**: {instance_id}")
+st.markdown("<hr>", unsafe_allow_html=True)
 
 # Initialize the ConversationManager object
 if 'chat_manager' not in st.session_state:
     st.session_state['chat_manager'] = ConversationManager()
 
 chat_manager = st.session_state['chat_manager']
+
+# Sidebar Configuration
+with st.sidebar:
+    # LOGO_URL = "media/logo.jpg"
+    # st.image(LOGO_URL, use_container_width=True) 
+    st.header("Chatbot Configuration")
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Slider for Max Tokens
+    max_tokens = st.slider(
+        label="**Max Tokens Per Message**",
+        min_value=10,
+        max_value=500,
+        value=chat_manager.max_tokens,
+        step=10
+    )
+
+    # Slider for Temperature
+    temperature = st.slider(
+        label="**Temperature**",
+        min_value=0.00,
+        max_value=1.00,
+        value=chat_manager.temperature,
+        step=0.01
+    )
+
+    # Show warning when slider value changes but not yet applied
+    if max_tokens != chat_manager.max_tokens or temperature != chat_manager.temperature:
+        st.warning("Changes not yet saved! Click 'Apply changes' to save.")
+
+    # Button to apply chatbot changes
+    if st.button("Apply changes"):
+        chat_manager.temperature = temperature
+        chat_manager.max_tokens = max_tokens
+        st.success("Changes applied successfully!")
+        st.write(f"Temperature set to: {temperature}")
+        st.write(f"Max Tokens set to: {max_tokens}")
+        
+    st.markdown("<hr>", unsafe_allow_html=True)
+    # Display EC2 Instance ID
+    instance_id = get_instance_id()
+    st.write(f"**EC2 Instance ID**: {instance_id}")
 
 # Initialize conversation history with a greeting message from the assistant
 if 'conversation_history' not in st.session_state:
@@ -127,7 +166,7 @@ if 'conversation_history' not in st.session_state:
 conversation_history = st.session_state['conversation_history']
 
 # Chat input from the user
-user_input = st.chat_input("Ask me questions!")
+user_input = st.chat_input("Ask Scientia Chatbot anything!")
 
 # Call the chat manager to get a response from the AI
 if user_input:
