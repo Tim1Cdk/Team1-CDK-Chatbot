@@ -1,4 +1,4 @@
-openai==1.54.4
+openai==1.55.0
 Requests==2.32.3
 streamlit==1.40.1
 tiktoken==0.8.0
