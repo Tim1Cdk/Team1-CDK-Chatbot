@@ -2,6 +2,8 @@ from openai import OpenAI
 import tiktoken
 import requests
 import os
+import base64
+from pathlib import Path
 import streamlit as st
 
 # DEFAULT_API_KEY = os.environ.get("TOGETHER_API_KEY")
@@ -105,9 +107,61 @@ def initialize_conversation():
     assistant_message = "Hi there! It's Scientia, your knowledge enlightenment assistant. How may I help you?"
     return [{"role": "assistant", "content": assistant_message}]
 
-### Streamlit code ###
-st.title("Scientia")
-st.markdown("<hr>", unsafe_allow_html=True)
+# Function to handle image conversion to base63
+def img_to_bytes(img_path):
+    img_bytes = Path(img_path).read_bytes()
+    encoded = base64.b64encode(img_bytes).decode()
+    return encoded
+
+# Function to generate HTML image
+def img_to_html(img_path, height=None):
+    img_html = f"<img src='data:image/png;base64,{img_to_bytes(img_path)}' class='img-fluid'"
+    if height:
+        img_html += f" style='height:{height}px;'>"
+    else:
+        img_html += ">"
+    return img_html
+
+# Function to customise sidebar
+def sidebar_css():
+    st.markdown(
+        """
+        <style>
+        /* Sidebar background color */
+        section[data-testid="stSidebar"] {
+            background-color: #B9E5E8 !important;
+        }
+
+        /* Sidebar text color */
+        section[data-testid="stSidebar"] .css-1d391kg { 
+            color: #000000 !important;
+        }
+
+        /* Sidebar header */
+        section[data-testid="stSidebar"] h1, h2, h3, h4, h5, h6 {
+            color: #000000 !important;
+        }
+
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+### Streamlit Chatbotcode ###
+logo_path = "media/logo.jpg"
+avatar_chatbot_path = "media/avatar_chatbot.png"
+avatar_user_path = "media/avatar_user.png"
+
+# Add logo
+st.markdown(
+    f"""
+    <div style="margin-bottom: 0px; text-align: center;">
+        {img_to_html(logo_path, height=150)}
+    </div>
+    <hr style="margin-top: 0px; margin-bottom: 8px; border: 0px solid #000;">
+    """,
+    unsafe_allow_html=True
+)
 
 # Initialize the ConversationManager object
 if 'chat_manager' not in st.session_state:
@@ -117,8 +171,7 @@ chat_manager = st.session_state['chat_manager']
 
 # Sidebar Configuration
 with st.sidebar:
-    # LOGO_URL = "media/logo.jpg"
-    # st.image(LOGO_URL, use_container_width=True) 
+    sidebar_css()
     st.header("Chatbot Configuration")
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -126,7 +179,7 @@ with st.sidebar:
     max_tokens = st.slider(
         label="**Max Tokens Per Message**",
         min_value=10,
-        max_value=500,
+        max_value=512,
         value=chat_manager.max_tokens,
         step=10
     )
@@ -172,11 +225,52 @@ user_input = st.chat_input("Ask Scientia Chatbot anything!")
 if user_input:
     response = chat_manager.chat_completion(user_input)
 
+# CSS for chat bubble
+st.markdown(
+    """
+    <style>
+    .chat-container {
+        display: flex;
+        flex-direction: column;
+    }
+    .message-row.user {
+        flex-direction: row-reverse;
+    }
+    .message-row.bot {
+        flex-direction: row;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # Display the conversation history
 for message in conversation_history:
+    # Hide initial messages and persona
     if message["role"] != "system":
-        # Set avatar image based on role
-        avatar_image = "media/avatar_user.png" if message["role"] == "assistant" else "media/avatar_chatbot.png"
-        # Display message with avatar
-        with st.chat_message(message["role"], avatar=avatar_image):
-            st.write(message["content"])
+        avatar_image = (
+            img_to_html("media/avatar_chatbot.png", height=32) if message["role"] == "assistant" 
+            else img_to_html("media/avatar_user.png", height=32)
+        )
+        bubble_class = "bot" if message["role"] == "assistant" else "user"
+
+        # Adjust margin between for avatars
+        if message["role"] == "user":
+            avatar_margin = "margin-left: 8px;"
+        else:
+            avatar_margin = "margin-right: 8px;"
+
+        # Adjust styling of chat bubble and avatars
+        st.markdown(
+            f"""
+            <div class="chat-container" style="display: flex; margin-bottom: 36px;">
+                <div class="message-row {bubble_class}" style="display: flex; align-items: center;">
+                    <div style="{avatar_margin}">{avatar_image}</div>
+                    <div class="chat-bubble {bubble_class}" style="background-color: {'#B9E5E8'}; padding: 16px; border-radius: 12px; max-width: 80%; word-wrap: break-word;">
+                        {message["content"]}
+                    </div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
