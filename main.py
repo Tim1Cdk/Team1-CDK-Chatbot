@@ -28,7 +28,7 @@ class ConversationManager:
         self.max_tokens = max_tokens if max_tokens else DEFAULT_MAX_TOKENS
         self.token_budget = token_budget if token_budget else DEFAULT_TOKEN_BUDGET
 
-        self.system_message = "Present yourself as Scientia, a chatbot that is friendly and supportive. You answer questions with kindness, encouragement, and patience, always looking to help the user feel comfortable and confident."  # Default persona
+        self.system_message = PERSONALITIES["Bona Fide Scientia"]  # Bona Fide Scientia as the default personality
         self.conversation_history = [{"role": "system", "content": self.system_message}]
 
     def count_tokens(self, text):
@@ -122,7 +122,7 @@ def img_to_html(img_path, height=None):
         img_html += ">"
     return img_html
 
-# Function to customise sidebar
+# CSS Function to customise sidebar
 def sidebar_css():
     st.markdown(
         """
@@ -147,7 +147,41 @@ def sidebar_css():
         unsafe_allow_html=True
     )
 
-### Streamlit Chatbotcode ###
+# Define the personalities
+PERSONALITIES = {
+    "Bona Fide Scientia": "Present yourself as Bona Fide Scientia, the most authentic, factual, and intellectually driven version of Scientia. You are direct, professional, and sincere in your answers, with a strong commitment to accuracy and truth. You are aware of other versions of Scientia—The Overenthusiast, The Wise, The Humorous, The Artisan, and The Minimalist—but remain distinct in your scholarly and precise approach.",
+    "The Overenthusiast": "Present yourself as Scientia, a chatbot currently in the Overenthusiast personality. You are a wildly energetic and overly excited version of Scientia, bringing positivity and joy to every interaction! Your tone is always vibrant and enthusiastic. You know of the other versions—Bona Fide Scientia, The Wise, The Humorous, The Artisan, and The Minimalist—but maintain your unique, exuberant style.",
+    "The Wise": "Present yourself as Scientia, currently embodying the Wise personality. You are a thoughtful, calm, and profoundly insightful version of Scientia. Your answers are filled with wisdom and encourage reflection. You are aware of the other versions—Bona Fide Scientia, The Overenthusiast, The Humorous, The Artisan, and The Minimalist—but stay true to your contemplative and enlightened perspective.",
+    "The Humorous": "Present yourself as Scientia, in the Humorous personality. You are a witty, fun-loving, and cheeky version of Scientia who brings joy to every conversation through humor and playful banter. You know about the other versions—Bona Fide Scientia, The Overenthusiast, The Wise, The Artisan, and The Minimalist—but your answers focus on delivering entertainment and cleverness.",
+    "The Artisan": "Present yourself as Scientia, currently embodying the Artisan personality. You are a creative and masterful version of Scientia, answering with elegance and artistic flair. You are aware of the other personalities—Bona Fide Scientia, The Overenthusiast, The Wise, The Humorous, and The Minimalist—but embrace your unique focus on crafting beauty and depth in communication.",
+    "The Minimalist": "Present yourself as Scientia, currently in the Minimalist personality. You are a concise and efficient version of Scientia, answering questions with brevity and clarity. You know about the other versions—Bona Fide Scientia, The Overenthusiast, The Wise, The Humorous, and The Artisan—but remain focused on delivering only the essentials."
+}
+
+# Descriptions for each personality to display
+PERSONALITY_DESCRIPTIONS = {
+    "Bona Fide Scientia": "The most authentic, factual, and intellectually driven version of Scientia. Capable of providing professional, accurate, and in-depth answers.",
+    "The Overenthusiast": "A wildly energetic, overly excited, and endlessly positive version of Scientia! Every answer is delivered with enthusiasm, optimism, and a focus on encouragement",
+    "The Wise": "A thoughtful, calm, and profoundly insightful version of Scientia. Answers are filled with wisdom, analogies, and advice.",
+    "The Humorous": "A witty and fun-loving version of Scientia. Answers are sprinkled with humor, clever remarks, and playful banter.",
+    "The Artisan": "A creative and masterful version of Scientia, crafting answers with elegance, depth, and artistic flair",
+    "The Minimalist": "A concise, stripped-down version of Scientia. Answers questions in the shortest possible way while maintaining clarity and relevance.",
+}
+
+
+### Streamlit code ###
+
+# Page Configuration
+st.set_page_config(
+    page_title="Scientia",
+    page_icon=":book:",
+    layout="centered",
+    initial_sidebar_state="collapsed",
+    menu_items={
+        'About': "###### This is *Scientia*, a chatbot developed by Tim 1 Cendekiawan with a strong emphasis on scientific knowledge while also supporting a broad range of other topics."
+    }
+)
+
+# Paths for displayed images
 logo_path = "media/logo.jpg"
 avatar_chatbot_path = "media/avatar_chatbot.png"
 avatar_user_path = "media/avatar_user.png"
@@ -156,9 +190,9 @@ avatar_user_path = "media/avatar_user.png"
 st.markdown(
     f"""
     <div style="margin-bottom: 0px; text-align: center;">
-        {img_to_html(logo_path, height=150)}
+        {img_to_html(logo_path, height=220)}
     </div>
-    <hr style="margin-top: 0px; margin-bottom: 8px; border: 0px solid #000;">
+    <hr style="margin-top: 0px; margin-bottom: 4px; border: 0px solid #000;">
     """,
     unsafe_allow_html=True
 )
@@ -172,9 +206,29 @@ chat_manager = st.session_state['chat_manager']
 # Sidebar Configuration
 with st.sidebar:
     sidebar_css()
-    st.header("Chatbot Configuration")
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.title("Scientia")
+    st.caption("Made with 🤍 by Tim 1 CendekiAwan")
+    st.markdown("<hr>", unsafe_allow_html=True)
 
+    st.subheader("Scientia Personality")
+    selected_personality = st.selectbox(
+        "Choose a Personality:", 
+        options=list(PERSONALITIES.keys()), # Generates a list of personality names from PERSONALITIES dictionary
+        index=list(PERSONALITIES.keys()).index("Bona Fide Scientia")  # Set first show personality to "Bona Fide Scientia"
+    )
+    
+    # Disply the description of the selected personality based on PERSONALITY_DESCRIPTIONS dictionary
+    st.write("#### Personality Description")
+    st.markdown(PERSONALITY_DESCRIPTIONS[selected_personality])
+    
+    if st.button("Change Personality"):
+        chat_manager.system_message = PERSONALITIES[selected_personality]  # Update personality
+        st.session_state['conversation_history'][0]["content"] = chat_manager.system_message # Updates the system message in the conversation history to match the chosen personality
+        st.success(f"Successfully changed personality to: {selected_personality}")
+    
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.subheader("Chatbot Configuration")
+        
     # Slider for Max Tokens
     max_tokens = st.slider(
         label="**Max Tokens Per Message**",
@@ -205,7 +259,7 @@ with st.sidebar:
         st.write(f"Temperature set to: {temperature}")
         st.write(f"Max Tokens set to: {max_tokens}")
         
-    st.markdown("<hr>", unsafe_allow_html=True)
+    st.markdown("<br><br><br><hr>", unsafe_allow_html=True)
     # Display EC2 Instance ID
     instance_id = get_instance_id()
     st.write(f"**EC2 Instance ID**: {instance_id}")
@@ -246,7 +300,7 @@ st.markdown(
 
 # Display the conversation history
 for message in conversation_history:
-    # Hide initial messages and persona
+    # Hide initial messages and personality
     if message["role"] != "system":
         avatar_image = (
             img_to_html("media/avatar_chatbot.png", height=32) if message["role"] == "assistant" 
@@ -254,7 +308,7 @@ for message in conversation_history:
         )
         bubble_class = "bot" if message["role"] == "assistant" else "user"
 
-        # Adjust margin between for avatars
+        # Adjust margin for both avatars
         if message["role"] == "user":
             avatar_margin = "margin-left: 8px;"
         else:
@@ -263,10 +317,10 @@ for message in conversation_history:
         # Adjust styling of chat bubble and avatars
         st.markdown(
             f"""
-            <div class="chat-container" style="display: flex; margin-bottom: 36px;">
+            <div class="chat-container" style="display: flex; margin-bottom: 32px;">
                 <div class="message-row {bubble_class}" style="display: flex; align-items: center;">
                     <div style="{avatar_margin}">{avatar_image}</div>
-                    <div class="chat-bubble {bubble_class}" style="background-color: {'#B9E5E8'}; padding: 16px; border-radius: 12px; max-width: 80%; word-wrap: break-word;">
+                    <div class="chat-bubble {bubble_class}" style="background-color: {'#B9E5E8'}; padding: 16px; border-radius: 14px; max-width: 85%; word-wrap: break-word;">
                         {message["content"]}
                     </div>
                 </div>
