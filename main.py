@@ -197,11 +197,30 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Initialize the ConversationManager object
 if 'chat_manager' not in st.session_state:
     st.session_state['chat_manager'] = ConversationManager()
 
+# Access chat_manager from session_state
 chat_manager = st.session_state['chat_manager']
+
+# Initialize chat rooms and active room 
+if 'chat_rooms' not in st.session_state:
+    st.session_state['chat_rooms'] = {"Main Chat Room": [{"role": "system", "content": chat_manager.system_message}]}
+
+# Initialize active_chat_room
+if 'active_chat_room' not in st.session_state:
+    st.session_state['active_chat_room'] = "Main Chat Room"  # Set default room
+
+# Ensure greeting message is added to the active chat room
+active_chat_room = st.session_state['active_chat_room']
+if active_chat_room not in st.session_state['chat_rooms']:
+    st.session_state['chat_rooms'][active_chat_room] = [{"role": "system", "content": chat_manager.system_message}]
+    # Add the greeting message when a new chat room is initialized
+    st.session_state['chat_rooms'][active_chat_room] += initialize_conversation()
+else:
+    # Ensure the greeting is at the beginning of the conversation history if not already included
+    if not any(message['role'] == 'assistant' and 'How may I help you?' in message['content'] for message in st.session_state['chat_rooms'][active_chat_room]):
+        st.session_state['chat_rooms'][active_chat_room] += initialize_conversation()
 
 # Sidebar Configuration
 with st.sidebar:
@@ -210,6 +229,45 @@ with st.sidebar:
     st.caption("Made with 🤍 by Tim 1 CendekiAwan")
     st.markdown("<hr>", unsafe_allow_html=True)
 
+    st.subheader("Chat Rooms")
+    # Select active chat room
+    chat_room_names = list(st.session_state['chat_rooms'].keys())
+    selected_chat_room = st.selectbox(
+    "Select Chat Room", 
+    options=chat_room_names, 
+    index=chat_room_names.index(st.session_state['active_chat_room'])
+    )
+
+    # Update active chat room
+    if selected_chat_room != st.session_state['active_chat_room']:
+        st.session_state['active_chat_room'] = selected_chat_room
+        st.session_state['conversation_history'] = st.session_state['chat_rooms'][selected_chat_room]
+        st.rerun()
+
+    # Button to add a new chat room
+    if st.button("Add a new chat room"):
+        new_chat_room_name = f"Chat Room {len(chat_room_names)}" # Assign name to new chat room
+        st.session_state['chat_rooms'][new_chat_room_name] = [{"role": "system", "content": chat_manager.system_message}]
+        st.session_state['active_chat_room'] = new_chat_room_name # Set active chat room to the added Chat Room
+    
+        # Display toast for successful creation
+        st.session_state['show_create_toast'] = new_chat_room_name  # Store the new chat room name to show in the toast
+        st.rerun()  # Re-run to update the page state
+
+    # Button to delete chat room (only shown  if the active chat room is not "Main Chat Room")
+    if st.session_state['active_chat_room'] != "Main Chat Room":
+        if st.button("Delete chat room"):
+            chat_room_to_delete = st.session_state['active_chat_room']  # Get the name of the chat room to delete
+            del st.session_state['chat_rooms'][st.session_state['active_chat_room']] # Delete chat room
+            st.session_state['active_chat_room'] = "Main Chat Room" # Set active chat room to the Main Chat Room
+            
+            st.session_state['show_delete_toast'] = chat_room_to_delete  # Store the chat room name to show in the toast
+            st.rerun()  # Re-run to update the page state
+
+    else:
+        st.warning("Main Chat Room cannot be deleted.")
+
+    st.markdown("<br><br>", unsafe_allow_html=True)
     st.subheader("Scientia Personality")
     selected_personality = st.selectbox(
         "Choose a Personality:", 
@@ -264,20 +322,34 @@ with st.sidebar:
     instance_id = get_instance_id()
     st.write(f"**EC2 Instance ID**: {instance_id}")
 
+# Display st.toast for chat room addition
+if 'show_create_toast' in st.session_state and st.session_state['show_create_toast']:
+    chat_room_name = st.session_state['show_create_toast']  # Get the name of the created chat room
+    st.toast(f"'{chat_room_name}' has been successfully created.", icon="✅")
+    del st.session_state['show_create_toast']  # Reset the flag after showing the toast
+
+# Display st.toast of chatroom deletion
+if 'show_delete_toast' in st.session_state and st.session_state['show_delete_toast']:
+    chat_room_name = st.session_state['show_delete_toast']  # Get the name of the deleted chat room
+    st.toast(f"'{chat_room_name}' has been successfully deleted.", icon="🚮")
+    del st.session_state['show_delete_toast']  # Reset the flag after showing the toast
+
 # Initialize conversation history with a greeting message from the assistant
 if 'conversation_history' not in st.session_state:
     st.session_state['conversation_history'] = chat_manager.conversation_history
     # Add the initial assistant message to greet the user
     st.session_state['conversation_history'] += initialize_conversation()
 
-conversation_history = st.session_state['conversation_history']
+conversation_history = st.session_state['chat_rooms'][active_chat_room]
 
 # Chat input from the user
-user_input = st.chat_input("Ask Scientia Chatbot anything!")
+user_input = st.chat_input(f"Ask Scientia Chatbot anything!")
 
 # Call the chat manager to get a response from the AI
 if user_input:
     response = chat_manager.chat_completion(user_input)
+    conversation_history.append({"role": "user", "content": user_input})
+    conversation_history.append({"role": "assistant", "content": response})
 
 # CSS for chat bubble
 st.markdown(
