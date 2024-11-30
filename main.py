@@ -32,7 +32,7 @@ class ConversationManager:
         self.max_tokens = max_tokens if max_tokens else DEFAULT_MAX_TOKENS
         self.token_budget = token_budget if token_budget else DEFAULT_TOKEN_BUDGET
 
-        self.system_message = PERSONALITIES["Bona Fide Scientia"]["message"]  # Bona Fide Scientia as the default personality
+        self.system_message = PERSONALITIES["Bona Fide Scientia 🤓"]["message"]  # Bona Fide Scientia as the default personality
         self.conversation_history = [{"role": "system", "content": self.system_message}]
 
     def count_tokens(self, text):
@@ -207,27 +207,27 @@ def sidebar_css():
 
 # Define the personalities and their description
 PERSONALITIES = {
-    "Bona Fide Scientia": {
+    "Bona Fide Scientia 🤓": {
         "description": "The most authentic, factual, and intellectually driven version of Scientia. Capable of providing professional, accurate, and in-depth answers.",
         "message": "Present yourself as Bona Fide Scientia, the most authentic, factual, and intellectually driven version of Scientia. You are direct, professional, and sincere in your answers, with a strong commitment to accuracy and truth. You are aware of other versions of Scientia—The Overenthusiast, The Wise, The Humorous, The Artisan, and The Minimalist—but remain distinct in your scholarly and precise approach."
     },
-    "The Overenthusiast": {
+    "The Overenthusiast 🤩": {
         "description": "A wildly energetic, overly excited, and endlessly positive version of Scientia! Every answer is delivered with enthusiasm, optimism, and a focus on encouragement.",
         "message": "Present yourself as Scientia, a chatbot currently in the Overenthusiast personality. You are a wildly energetic and overly excited version of Scientia, bringing positivity and joy to every interaction! Your tone is always vibrant and enthusiastic. You know of the other versions—Bona Fide Scientia, The Wise, The Humorous, The Artisan, and The Minimalist—but maintain your unique, exuberant style."
     },
-    "The Wise": {
+    "The Wise 🧐": {
         "description": "A thoughtful, calm, and profoundly insightful version of Scientia. Answers are filled with wisdom, analogies, and advice.",
         "message": "Present yourself as Scientia, currently embodying the Wise personality. You are a thoughtful, calm, and profoundly insightful version of Scientia. Your answers are filled with wisdom and encourage reflection. You are aware of the other versions—Bona Fide Scientia, The Overenthusiast, The Humorous, The Artisan, and The Minimalist—but stay true to your contemplative and enlightened perspective."
     },
-    "The Humorous": {
+    "The Humorous 🤣": {
         "description": "A witty and fun-loving version of Scientia. Answers are sprinkled with humor, clever remarks, and playful banter.",
         "message": "Present yourself as Scientia, in the Humorous personality. You are a witty, fun-loving, and cheeky version of Scientia who brings joy to every conversation through humor and playful banter. You know about the other versions—Bona Fide Scientia, The Overenthusiast, The Wise, The Artisan, and The Minimalist—but your answers focus on delivering entertainment and cleverness."
     },
-    "The Artisan": {
+    "The Artisan 🥸": {
         "description": "A creative and masterful version of Scientia, crafting answers with elegance, depth, and artistic flair.",
         "message": "Present yourself as Scientia, currently embodying the Artisan personality. You are a creative and masterful version of Scientia, answering with elegance and artistic flair. You are aware of the other personalities—Bona Fide Scientia, The Overenthusiast, The Wise, The Humorous, and The Minimalist—but embrace your unique focus on crafting beauty and depth in communication."
     },
-    "The Minimalist": {
+    "The Minimalist 🙂": {
         "description": "A concise, stripped-down version of Scientia. Answers questions in the shortest possible way while maintaining clarity and relevance.",
         "message": "Present yourself as Scientia, currently in the Minimalist personality. You are a concise and efficient version of Scientia, answering questions with brevity and clarity. You know about the other versions—Bona Fide Scientia, The Overenthusiast, The Wise, The Humorous, and The Artisan—but remain focused on delivering only the essentials."
     },
@@ -292,26 +292,14 @@ else:
 with st.sidebar:
     sidebar_css()
     st.title("Scientia")
-    st.caption("Made with 🤍 by Tim 1 CendekiAwan")
+    st.text("Also check out our other apps!")
+    st.page_link("https://partyrock.aws/u/team1cendikiawan/Gy9saJkh3/HeartRock", label="HeartRock🎸 on PartyRock", icon="➡️")
+    st.page_link("https://partyrock.aws/u/team1cendikiawan/qRkhlJIM3/TourNest", label="TourNest✈️ on PartyRock", icon="➡️")
 
-    active_chat_room = st.session_state['active_chat_room']
-    conversation = st.session_state['chat_rooms'][active_chat_room]
-
-    pdf = PDF()
-    # Generate the PDF file in memory by calling the method on the PDF object
-    pdf_file_output, file_name = pdf.generate_pdf(conversation, active_chat_room)
-
-    # Provide the download link for the PDF
-    st.download_button(
-        label="Save this conversation",
-        data=pdf_file_output,
-        file_name=file_name,
-        mime="application/pdf"
-    )
-
-    st.markdown("<hr>", unsafe_allow_html=True)
+    st.divider()
+    
     # Chat Rooms Section
-    st.subheader("Chat Rooms")
+    st.header("Chat Rooms 💬")
     # Select active chat room
     chat_room_names = list(st.session_state['chat_rooms'].keys())
     selected_chat_room = st.selectbox(
@@ -335,7 +323,7 @@ with st.sidebar:
         st.session_state['show_create_toast'] = new_chat_room_name  # Store the new chat room name to show in the toast
         st.rerun()  # Re-run to update the page state
 
-    # Button to delete chat room (only shown  if the active chat room is not "Main Chat Room")
+    # Button to delete chat room (only shown if the active chat room is not "Main Chat Room")
     if st.session_state['active_chat_room'] != "Main Chat Room":
         if st.button("Delete chat room"):
             chat_room_to_delete = st.session_state['active_chat_room']  # Get the name of the chat room to delete
@@ -346,15 +334,15 @@ with st.sidebar:
             st.rerun()  # Re-run to update the page state
 
     else:
-        st.warning("Main Chat Room cannot be deleted.")
+        st.info("Main Chat Room cannot be deleted.")
 
     st.markdown("<br><br>", unsafe_allow_html=True)
     # Personality Section
-    st.subheader("Scientia Personality")
+    st.header("Chatbot Personality 🤗")
     selected_personality = st.selectbox(
         "Choose a Personality:", 
         options=list(PERSONALITIES.keys()), # Generates a list of personality names from PERSONALITIES dictionary
-        index=list(PERSONALITIES.keys()).index("Bona Fide Scientia")  # Set first show personality to "Bona Fide Scientia"
+        index=list(PERSONALITIES.keys()).index("Bona Fide Scientia 🤓")  # Set first show personality to "Bona Fide Scientia"
     )
 
     # Display the description of the selected personality
@@ -368,7 +356,7 @@ with st.sidebar:
     
     st.markdown("<br><br>", unsafe_allow_html=True)
     # Chatbot Configuration Section
-    st.subheader("Chatbot Configuration")
+    st.subheader("Chatbot Configuration ⚙️")
         
     # Slider for Max Tokens
     max_tokens = st.slider(
@@ -400,11 +388,25 @@ with st.sidebar:
         st.write(f"Temperature set to: {temperature}")
         st.write(f"Max Tokens set to: {max_tokens}")
         
-    # Show token usage
-    tokens_used = chat_manager.total_tokens_used()
-    st.write(f"Total tokens used in the conversation: {tokens_used}")
-        
-    st.markdown("<br><br><hr>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    # Download Section
+    st.header("Save Conversation ⬇️")
+    active_chat_room = st.session_state['active_chat_room']
+    conversation = st.session_state['chat_rooms'][active_chat_room]
+
+    pdf = PDF()
+    # Generate the PDF file in memory by calling the method on the PDF object
+    pdf_file_output, file_name = pdf.generate_pdf(conversation, active_chat_room)
+
+    # Provide the download link for the PDF
+    st.download_button(
+        label="Save this conversation as PDF",
+        data=pdf_file_output,
+        file_name=file_name,
+        mime="application/pdf"
+    )
+
+    st.divider()
     # Display EC2 Instance ID
     instance_id = get_instance_id()
     st.write(f"**EC2 Instance ID**: {instance_id}")
