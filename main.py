@@ -107,9 +107,13 @@ class PDF(FPDF):
         self.cell(0, 10, f"Time saved: {current_time}", new_x='RIGHT', new_y='TOP')
 
     def generate_pdf(self, conversation, chat_room_name):
+        
+        # Count only user and assistant messages with filter
+        filtered_conversation = [msg for msg in conversation if msg['role'] in ['user', 'assistant']]
+
         # Calculate statistics
-        total_messages = len(conversation)
-        total_words = sum(len(message['content'].split()) for message in conversation)
+        total_messages = len(filtered_conversation)
+        total_words = sum(len(message['content'].split()) for message in filtered_conversation)
 
         # Add metadata
         self.cell(0, 8, f"Chat Room: {chat_room_name}", new_x='LMARGIN', new_y='NEXT')
