@@ -89,9 +89,12 @@ class ConversationManager:
     def reset_conversation_history(self):
         self.conversation_history = [{"role": "system", "content": self.system_message}]
 
-class ConversationExporter(ABC):
+class ConversationExporter(ABC): # Abstract base class for exporting conversation data in different formats
     def __init__(self, conversation, chat_room_name):
+         # Filter out messages that are not from the user or assistant
         self.conversation = [msg for msg in conversation if msg['role'] in ['user', 'assistant']] # Count only user and assistant messages with filter
+         
+         # Store the chat room name
         self.chat_room_name = chat_room_name
         
         # Calculate statistics
@@ -99,61 +102,85 @@ class ConversationExporter(ABC):
         self.total_words = sum(len(msg['content'].split()) for msg in self.conversation) # Count total words
         self.total_characters = sum(len(msg['content']) for msg in self.conversation) # Count total characters
 
+    # Abstract method to be implemented in subclasses
     @abstractmethod
     def generate_file(self):
         pass
 
     def generate_file_name(self, extension):
+        # Generate a unique file name with a timestamp and suitable extension
         timestamp = datetime.now().strftime("%H-%M-%S--%d-%m-%Y")
         return f"Scientia-{self.chat_room_name}-{timestamp}.{extension}"
 
-class PDFExporter(ConversationExporter):
+class PDFExporter(ConversationExporter):  # Subclass to export data as a PDF file
     def __init__(self, conversation, chat_room_name):
         super().__init__(conversation, chat_room_name)
-        self.pdf = FPDF()
-        self.pdf.add_font('DejaVuSans', '', 'fonts/DejaVuSans.ttf')
-        self.pdf.add_page()
+        self.pdf = FPDF(orientation="P", unit="mm", format="A4")
         self.pdf.set_auto_page_break(auto=True, margin=15)
+        self.pdf.set_margins(15, 15, 15)
+        self.pdf.add_page()
+        self.pdf.add_font('DejaVuSans', '', 'fonts/DejaVuSans.ttf')
+        self.pdf.add_font('DejaVuSans-Bold', '', 'fonts/DejaVuSans-Bold.ttf')
         self.pdf.set_font('DejaVuSans', size=12)
 
     def header(self):
-        self.pdf.image("media/logo.jpg", 155, 5, 33)
-        self.pdf.ln(15)
-        self.pdf.line(10, self.pdf.get_y(), 200, self.pdf.get_y())
-        self.pdf.ln(10)
+        # Logo
+        self.pdf.image("media/logo.jpg", 170, 10, 30)
 
-    def footer(self):
-        self.pdf.set_y(-15)
+        # Saving Time
         current_time = datetime.now().strftime("%H:%M:%S - %d/%m/%Y")
-        self.pdf.set_font('DejaVuSans', '', 8)
-        self.pdf.cell(0, 10, f"Time saved: {current_time}", new_x='RIGHT', new_y='TOP')
+        self.pdf.set_font('DejaVuSans', size=8)
+        self.pdf.set_xy(10, 13)
+        self.pdf.cell(0, 10, f"Saving Time: {current_time}", align='L')
 
-    def generate_file(self):      
-        # Add metadata
+        # Line below the header
+        self.pdf.set_line_width(0.5)
+        self.pdf.line(10, 25, 200, 25)
+
+        # Title
+        self.pdf.set_font('DejaVuSans-Bold', size=16)
+        self.pdf.set_xy(0, 30)
+        self.pdf.cell(210, 10, "Scientia Saved Conversation", align='C')
+
+        self.pdf.ln(15) 
+        
+    def generate_file(self):
+        # Add header
         self.header()
-        self.pdf.cell(0, 8, f"Chat Room: {self.chat_room_name}", new_x='LMARGIN', new_y='NEXT')
-        self.pdf.cell(0, 8, f"Number of messages: {self.total_messages}", new_x='LMARGIN', new_y='NEXT')
-        self.pdf.cell(0, 8, f"Number of words: {self.total_words}", new_x='LMARGIN', new_y='NEXT')
-        self.pdf.cell(0, 8, f"Number of characters: {self.total_characters}", new_x='LMARGIN', new_y='NEXT')
+
+        # Metadata Section
+        self.pdf.set_font('DejaVuSans', size=12)
+        self.pdf.cell(0, 8, f"Chat Room: {self.chat_room_name}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.pdf.cell(0, 8, f"Number of messages: {self.total_messages}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.pdf.cell(0, 8, f"Number of words: {self.total_words}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.pdf.cell(0, 8, f"Number of characters: {self.total_characters}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         self.pdf.ln(10)
 
-        # Add conversation logs
+        # Conversation Logs
         for message in self.conversation:
             role = "Chatbot" if message['role'] == 'assistant' else "User"
-            self.pdf.multi_cell(0, 12, f"{role}: \"{message['content']}\"")
+            label_color = (185, 229, 232) if role == "Chatbot" else (128, 128, 128)
+
+            # Label
+            self.pdf.set_fill_color(*label_color)
+            self.pdf.set_font('DejaVuSans-Bold', size=12)
+            self.pdf.cell(0, 10, f"{role}:", new_x=XPos.LMARGIN, new_y=YPos.NEXT, fill=True)
+
+            # Content
+            self.pdf.set_font('DejaVuSans', size=12)
+            self.pdf.multi_cell(0, 10, f"{message['content']}")
             self.pdf.ln(5)
 
-        self.footer()
-        
         # Save to memory
-        pdf_output = BytesIO()
-        self.pdf.output(pdf_output)
-        pdf_output.seek(0)
-        return pdf_output, self.generate_file_name("pdf")
+        pdf_output = BytesIO() # Create a byte stream to hold the PDF data
+        self.pdf.output(pdf_output) # Save the PDF content into the byte stream
+        pdf_output.seek(0) # Reset the stream pointer to the beginning of the byte stream
+        return pdf_output, self.generate_file_name("pdf") # Return the  PDF data and generated file name
 
-class TXTExporter(ConversationExporter):
+class TXTExporter(ConversationExporter): # Subclass to export data as a TXT file
     def generate_file(self):
         
+        # Get the current timestamp
         current_time = datetime.now().strftime("%H:%M:%S - %d/%m/%Y")
         
         # Prepare conversation logs
@@ -166,21 +193,25 @@ class TXTExporter(ConversationExporter):
             f"Number of characters: {self.total_characters}",
             "\n\n--- Conversation ---\n\n"
         ]
+        
+        # Append each message in the conversation
         for message in self.conversation:
             role = "Chatbot" if message['role'] == 'assistant' else "User"
             lines.append(f"{role}: {message['content']}\n")
 
-        # Save to memory as a string
+        # Combine all the lines into a single string
         file_output = "\n".join(lines)
 
-        # Generate file name
+        # Generate the file name, then return file
         file_name = self.generate_file_name("txt")
         return file_output, file_name
         
-class CSVExporter(ConversationExporter):
+class CSVExporter(ConversationExporter): # Subclass to export data as a CSV file
     def generate_file(self):
-        # Prepare conversation logs
+        # Prepare to store CSV data
         output = StringIO()
+        
+         # Create a CSV writer object
         writer = csv.writer(output, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
 
         # Add headers
@@ -191,12 +222,11 @@ class CSVExporter(ConversationExporter):
             sender = "Chatbot" if message['role'] == 'assistant' else "User"
             writer.writerow([sender, message['content'], self.chat_room_name])
 
-        # Save to memory as string
+        # Retrieve the CSV content as a string
         file_output = output.getvalue()
 
-        # Generate file name
+        # Generate the file name, then return file
         file_name = self.generate_file_name("csv")
-
         return file_output, file_name
     
 def get_instance_id():
@@ -226,17 +256,27 @@ def initialize_conversation():
 
 # Function to handle image conversion to base63
 def img_to_bytes(img_path):
+    # Read the image file as bytes
     img_bytes = Path(img_path).read_bytes()
+    
+    # Encode the image bytes to base64 and decode to a string
     encoded = base64.b64encode(img_bytes).decode()
+    
+    # Return the encoded base64 string
     return encoded
 
 # Function to generate HTML image
 def img_to_html(img_path, height=None):
+    # Create an HTML image tag with the base64-encoded image as the source
     img_html = f"<img src='data:image/png;base64,{img_to_bytes(img_path)}' class='img-fluid'"
+    
+    # Add a style attribute for height
     if height:
         img_html += f" style='height:{height}px;'>"
     else:
         img_html += ">"
+        
+    # Return the complete HTML image tag
     return img_html
 
 # CSS Function to customise sidebar
@@ -248,17 +288,6 @@ def sidebar_css():
         section[data-testid="stSidebar"] {
             background-color: #B9E5E8 !important;
         }
-
-        /* Sidebar text color */
-        section[data-testid="stSidebar"] .css-1d391kg { 
-            color: #000000 !important;
-        }
-
-        /* Sidebar header */
-        section[data-testid="stSidebar"] h1, h2, h3, h4, h5, h6 {
-            color: #000000 !important;
-        }
-
         </style>
         """,
         unsafe_allow_html=True
@@ -322,30 +351,31 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# Initialize chat_manager, chat_rooms, and active_chat_room if they are not already in session_state
 if 'chat_manager' not in st.session_state:
     st.session_state['chat_manager'] = ConversationManager()
 
 # Access chat_manager from session_state
 chat_manager = st.session_state['chat_manager']
 
-# Initialize chat rooms and active room 
+# Initialize chat rooms if not present, with a default "Main Chat Room" and system message
 if 'chat_rooms' not in st.session_state:
-    st.session_state['chat_rooms'] = {"Main Chat Room": [{"role": "system", "content": chat_manager.system_message}]}
+    st.session_state['chat_rooms'] = {
+        "Main Chat Room": [{"role": "system", "content": chat_manager.system_message}]
+    }
 
-# Initialize active_chat_room
-if 'active_chat_room' not in st.session_state:
-    st.session_state['active_chat_room'] = "Main Chat Room"  # Set default room
+# Initialize active_chat_room if not present, defaulting to "Main Chat Room"
+st.session_state['active_chat_room'] = st.session_state.get('active_chat_room', "Main Chat Room")
 
-# Ensure greeting message is added to the active chat room
+# Ensure the active chat room exists in chat_rooms and add the greeting message if necessary
 active_chat_room = st.session_state['active_chat_room']
 if active_chat_room not in st.session_state['chat_rooms']:
     st.session_state['chat_rooms'][active_chat_room] = [{"role": "system", "content": chat_manager.system_message}]
-    # Add the greeting message when a new chat room is initialized
-    st.session_state['chat_rooms'][active_chat_room] += initialize_conversation()
+    st.session_state['chat_rooms'][active_chat_room] += initialize_conversation()  # Add greeting message
 else:
-    # Ensure the greeting is at the beginning of the conversation history if not already included
+    # Ensure the greeting is included in the conversation history if not already present
     if not any(message['role'] == 'assistant' and 'How may I help you?' in message['content'] for message in st.session_state['chat_rooms'][active_chat_room]):
-        st.session_state['chat_rooms'][active_chat_room] += initialize_conversation()
+        st.session_state['chat_rooms'][active_chat_room] += initialize_conversation()  # Add greeting message if missing
 
 # Sidebar Configuration
 with st.sidebar:
@@ -361,8 +391,11 @@ with st.sidebar:
     
     # Chat Rooms Section
     st.header("Chat Rooms 💬")
-    # Select active chat room
+    
+    # Get the list of available chat rooms from session_state
     chat_room_names = list(st.session_state['chat_rooms'].keys())
+    
+    # Create a selectbox for the user to choose the active chat room
     selected_chat_room = st.selectbox(
     "Select Chat Room", 
     options=chat_room_names, 
@@ -378,32 +411,33 @@ with st.sidebar:
     # Button to add a new chat room
     if st.button("Add a new chat room"):
         new_chat_room_name = f"Chat Room {len(chat_room_names)}" # Assign name to new chat room
-        st.session_state['chat_rooms'][new_chat_room_name] = [{"role": "system", "content": chat_manager.system_message}]
-        st.session_state['active_chat_room'] = new_chat_room_name # Set active chat room to the added Chat Room
-    
-        st.session_state['show_create_toast'] = new_chat_room_name  # Store the new chat room name to show in the toast
-        st.rerun()  # Re-run to update the page state
+        st.session_state['chat_rooms'][new_chat_room_name] = [{"role": "system", "content": chat_manager.system_message}] # Initialize the new chat room with a system message
+        st.session_state['active_chat_room'] = new_chat_room_name # Set the newly created chat room as the active chat room# Set the newly created chat room as the active chat room
+        st.session_state['show_create_toast'] = new_chat_room_name # Store the new chat room name in session_state to show in a toast notification
+        st.rerun()  
 
     # Button to delete chat room (only shown if the active chat room is not "Main Chat Room")
     if st.session_state['active_chat_room'] != "Main Chat Room":
         if st.button("Delete chat room"):
-            chat_room_to_delete = st.session_state['active_chat_room']  # Get the name of the chat room to delete
+            chat_room_to_delete = st.session_state['active_chat_room'] # Get the name of the chat room to delete       
             del st.session_state['chat_rooms'][st.session_state['active_chat_room']] # Delete chat room
             st.session_state['active_chat_room'] = "Main Chat Room" # Set active chat room to the Main Chat Room
-            
-            st.session_state['show_delete_toast'] = chat_room_to_delete  # Store the chat room name to show in the toast
-            st.rerun()  # Re-run to update the page state
+            st.session_state['show_delete_toast'] = chat_room_to_delete # Store the chat room name to show in the toast
+            st.rerun()
 
     else:
         st.info("Main Chat Room cannot be deleted.")
 
     st.markdown("<br><br>", unsafe_allow_html=True)
+    
     # Personality Section
     st.header("Chatbot Personality 🤗")
     selected_personality = st.selectbox(
         "Choose a Personality:", 
-        options=list(PERSONALITIES.keys()), # Generates a list of personality names from PERSONALITIES dictionary
-        index=list(PERSONALITIES.keys()).index("Bona Fide Scientia 🤓")  # Set first show personality to "Bona Fide Scientia"
+        # Generates a list of personality names from PERSONALITIES dictionary
+        options=list(PERSONALITIES.keys()),
+        # Set first show personality to "Bona Fide Scientia"
+        index=list(PERSONALITIES.keys()).index("Bona Fide Scientia 🤓")  
     )
 
     # Display the description of the selected personality
@@ -411,8 +445,9 @@ with st.sidebar:
     st.markdown(PERSONALITIES[selected_personality]["description"])
 
     if st.button("Change Personality"):
-        chat_manager.system_message = PERSONALITIES[selected_personality]["message"]  # Update message of the selected personality
-        st.session_state['conversation_history'][0]["content"] = chat_manager.system_message  # Updates the system message in the conversation history to match the chosen personality
+        # Update message of the selected personality
+        chat_manager.system_message = PERSONALITIES[selected_personality]["message"]  
+        st.session_state['conversation_history'][0]["content"] = chat_manager.system_message # Updates the system message in the conversation history to match the chosen personality
         st.success(f"Successfully changed personality to: {selected_personality}")
     
     st.markdown("<br><br>", unsafe_allow_html=True)
@@ -450,10 +485,11 @@ with st.sidebar:
         st.write(f"Max Tokens set to: {max_tokens}")
         
     st.markdown("<br><br>", unsafe_allow_html=True)
+    
     # Download Section
     st.header("Save Conversation ⬇️")
-    active_chat_room = st.session_state['active_chat_room']
-    conversation = st.session_state['chat_rooms'][active_chat_room]
+    active_chat_room = st.session_state['active_chat_room'] # Get the currently active chat room from session_state
+    conversation = st.session_state['chat_rooms'][active_chat_room] # Retrieve the conversation messages for the active chat room
 
     # Map format to classes formats
     exporter_classes = {
@@ -510,22 +546,22 @@ if 'show_delete_toast' in st.session_state and st.session_state['show_delete_toa
     st.toast(f"'{chat_room_name}' has been successfully deleted.", icon="🚮")
     del st.session_state['show_delete_toast']  # Reset the flag after showing the toast
 
-# Initialize conversation history with a greeting message from the assistant
+# Check if conversation history is not already initialized
 if 'conversation_history' not in st.session_state:
-    st.session_state['conversation_history'] = chat_manager.conversation_history
-    # Add the initial assistant message to greet the user
-    st.session_state['conversation_history'] += initialize_conversation()
+    st.session_state['conversation_history'] = chat_manager.conversation_history # Initialize with existing conversation history from chat_manager
+    st.session_state['conversation_history'] += initialize_conversation() # Add the initial assistant message to greet the user
 
+# Retrieve the conversation history for the active chat room
 conversation_history = st.session_state['chat_rooms'][active_chat_room]
 
 # Chat input from the user
 user_input = st.chat_input("Ask Scientia Chatbot anything!")
 
-# Call the chat manager to get a response from the AI
+# Check if the user has entered any input
 if user_input:
-    response = chat_manager.chat_completion(user_input)
-    conversation_history.append({"role": "user", "content": user_input})
-    conversation_history.append({"role": "assistant", "content": response})
+    response = chat_manager.chat_completion(user_input) # Get the AI's response using the chat manager
+    conversation_history.append({"role": "user", "content": user_input}) # Add the user's message to the conversation history
+    conversation_history.append({"role": "assistant", "content": response}) # Add the AI's response to the conversation history
 
 # CSS for chat bubble
 st.markdown(
