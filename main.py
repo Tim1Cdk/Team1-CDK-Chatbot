@@ -5,9 +5,12 @@ import os
 import base64
 from pathlib import Path
 from io import BytesIO
+from io import StringIO
 from fpdf import FPDF
+import csv
 from fpdf.enums import XPos, YPos
 from datetime import datetime
+from abc import ABC, abstractmethod
 import streamlit as st
 
 # DEFAULT_API_KEY = os.environ.get("TOGETHER_API_KEY")
@@ -86,60 +89,116 @@ class ConversationManager:
     def reset_conversation_history(self):
         self.conversation_history = [{"role": "system", "content": self.system_message}]
 
-class PDF(FPDF):
-    def __init__(self):
-        super().__init__()
-        self.add_font('DejaVuSans', '', 'fonts/DejaVuSans.ttf')
-        self.add_page()
-        self.set_auto_page_break(auto=True, margin=15)
-        self.set_font('DejaVuSans', size=12)
+class ConversationExporter(ABC):
+    def __init__(self, conversation, chat_room_name):
+        self.conversation = [msg for msg in conversation if msg['role'] in ['user', 'assistant']] # Count only user and assistant messages with filter
+        self.chat_room_name = chat_room_name
+        
+        # Calculate statistics
+        self.total_messages = len(self.conversation) # Count total messages
+        self.total_words = sum(len(msg['content'].split()) for msg in self.conversation) # Count total words
+        self.total_characters = sum(len(msg['content']) for msg in self.conversation) # Count total characters
+
+    @abstractmethod
+    def generate_file(self):
+        pass
+
+    def generate_file_name(self, extension):
+        timestamp = datetime.now().strftime("%H-%M-%S--%d-%m-%Y")
+        return f"Scientia-{self.chat_room_name}-{timestamp}.{extension}"
+
+class PDFExporter(ConversationExporter):
+    def __init__(self, conversation, chat_room_name):
+        super().__init__(conversation, chat_room_name)
+        self.pdf = FPDF()
+        self.pdf.add_font('DejaVuSans', '', 'fonts/DejaVuSans.ttf')
+        self.pdf.add_page()
+        self.pdf.set_auto_page_break(auto=True, margin=15)
+        self.pdf.set_font('DejaVuSans', size=12)
 
     def header(self):
-        self.image("media/logo.jpg", 155, 5, 33)
-        self.ln(15)
-        self.line(10, self.get_y(), 200, self.get_y())
-        self.ln(10)
+        self.pdf.image("media/logo.jpg", 155, 5, 33)
+        self.pdf.ln(15)
+        self.pdf.line(10, self.pdf.get_y(), 200, self.pdf.get_y())
+        self.pdf.ln(10)
 
     def footer(self):
-        self.set_y(-15)
+        self.pdf.set_y(-15)
         current_time = datetime.now().strftime("%H:%M:%S - %d/%m/%Y")
-        self.set_font('DejaVuSans', '', 8)
-        self.cell(0, 10, f"Time saved: {current_time}", new_x='RIGHT', new_y='TOP')
+        self.pdf.set_font('DejaVuSans', '', 8)
+        self.pdf.cell(0, 10, f"Time saved: {current_time}", new_x='RIGHT', new_y='TOP')
 
-    def generate_pdf(self, conversation, chat_room_name):
-        
-        # Count only user and assistant messages with filter
-        filtered_conversation = [msg for msg in conversation if msg['role'] in ['user', 'assistant']]
-
-        # Calculate statistics
-        total_messages = len(filtered_conversation)
-        total_words = sum(len(message['content'].split()) for message in filtered_conversation)
-
+    def generate_file(self):      
         # Add metadata
-        self.cell(0, 8, f"Chat Room: {chat_room_name}", new_x='LMARGIN', new_y='NEXT')
-        self.cell(0, 8, f"Number of messages: {total_messages}", new_x='LMARGIN', new_y='NEXT')
-        self.cell(0, 8, f"Number of words: {total_words}", new_x='LMARGIN', new_y='NEXT')
-        self.ln(10)
+        self.header()
+        self.pdf.cell(0, 8, f"Chat Room: {self.chat_room_name}", new_x='LMARGIN', new_y='NEXT')
+        self.pdf.cell(0, 8, f"Number of messages: {self.total_messages}", new_x='LMARGIN', new_y='NEXT')
+        self.pdf.cell(0, 8, f"Number of words: {self.total_words}", new_x='LMARGIN', new_y='NEXT')
+        self.pdf.cell(0, 8, f"Number of characters: {self.total_characters}", new_x='LMARGIN', new_y='NEXT')
+        self.pdf.ln(10)
 
         # Add conversation logs
-        for message in conversation:
-            if message['role'] != 'system':
-                role = "Chatbot" if message['role'] == 'assistant' else "User"
-                self.multi_cell(0, 12, f"{role}: \"{message['content']}\"")
-                self.ln(5)
+        for message in self.conversation:
+            role = "Chatbot" if message['role'] == 'assistant' else "User"
+            self.pdf.multi_cell(0, 12, f"{role}: \"{message['content']}\"")
+            self.pdf.ln(5)
 
-        # Generate file name with current datetime
-        now = datetime.now()
-        timestamp = now.strftime("%H-%M-%S--%d-%m-%Y")
-        file_name = f"Scientia-{chat_room_name}-{timestamp}.pdf"
-
-        # Create a BytesIO object to save the PDF in memory
-        pdf_output = BytesIO()
-        self.output(pdf_output)
-        pdf_output.seek(0)  # Move to the beginning of the file for download
-
-        return pdf_output, file_name
+        self.footer()
         
+        # Save to memory
+        pdf_output = BytesIO()
+        self.pdf.output(pdf_output)
+        pdf_output.seek(0)
+        return pdf_output, self.generate_file_name("pdf")
+
+class TXTExporter(ConversationExporter):
+    def generate_file(self):
+        
+        current_time = datetime.now().strftime("%H:%M:%S - %d/%m/%Y")
+        
+        # Prepare conversation logs
+        lines = [
+            f"‧˚₊• ══════ Scientia ══════ ‧˚₊•\n\n",
+            f"Chat Room: {self.chat_room_name}",
+            f"Time Saved: {current_time}",
+            f"Number of messages: {self.total_messages}",
+            f"Number of words: {self.total_words}",
+            f"Number of characters: {self.total_characters}",
+            "\n\n--- Conversation ---\n\n"
+        ]
+        for message in self.conversation:
+            role = "Chatbot" if message['role'] == 'assistant' else "User"
+            lines.append(f"{role}: {message['content']}\n")
+
+        # Save to memory as a string
+        file_output = "\n".join(lines)
+
+        # Generate file name
+        file_name = self.generate_file_name("txt")
+        return file_output, file_name
+        
+class CSVExporter(ConversationExporter):
+    def generate_file(self):
+        # Prepare conversation logs
+        output = StringIO()
+        writer = csv.writer(output, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+
+        # Add headers
+        writer.writerow(["Sender", "Message", "Chat Room"])
+
+        # Add conversation logs
+        for message in self.conversation:
+            sender = "Chatbot" if message['role'] == 'assistant' else "User"
+            writer.writerow([sender, message['content'], self.chat_room_name])
+
+        # Save to memory as string
+        file_output = output.getvalue()
+
+        # Generate file name
+        file_name = self.generate_file_name("csv")
+
+        return file_output, file_name
+    
 def get_instance_id():
     """Retrieve the EC2 instance ID from AWS metadata using IMDSv2."""
     try:
@@ -292,9 +351,11 @@ else:
 with st.sidebar:
     sidebar_css()
     st.title("Scientia")
-    st.text("Also check out our other apps!")
-    st.page_link("https://partyrock.aws/u/team1cendikiawan/Gy9saJkh3/HeartRock", label="HeartRock🎸 on PartyRock", icon="➡️")
-    st.page_link("https://partyrock.aws/u/team1cendikiawan/qRkhlJIM3/TourNest", label="TourNest✈️ on PartyRock", icon="➡️")
+    st.caption ("Made with 🤍 by Tim 1 Cendekiawan")
+    st.write("Also check out our other apps!")
+    st.page_link("https://partyrock.aws/u/team1cendikiawan/Gy9saJkh3/HeartRock", label="**HeartRock🎸** on PartyRock", icon="➡️")
+    st.page_link("https://partyrock.aws/u/team1cendikiawan/qRkhlJIM3/TourNest", label="**TourNest✈️** on PartyRock", icon="➡️")
+    
 
     st.divider()
     
@@ -394,18 +455,44 @@ with st.sidebar:
     active_chat_room = st.session_state['active_chat_room']
     conversation = st.session_state['chat_rooms'][active_chat_room]
 
-    pdf = PDF()
-    # Generate the PDF file in memory by calling the method on the PDF object
-    pdf_file_output, file_name = pdf.generate_pdf(conversation, active_chat_room)
+    # Map format to classes formats
+    exporter_classes = {
+        "pdf": PDFExporter,
+        "txt": TXTExporter,
+        "csv": CSVExporter
+    }
 
-    # Provide the download link for the PDF
-    st.download_button(
-        label="Save this conversation as PDF",
-        data=pdf_file_output,
-        file_name=file_name,
-        mime="application/pdf"
+    # Selectbox to choose format
+    export_format = st.selectbox(
+        "Choose a file format:",
+        options=["pdf", "txt","csv"],
+        index=0
     )
 
+    # Get suitable classes
+    exporter_class = exporter_classes[export_format]
+
+    # Create object exporter and generate file
+    exporter = exporter_class(conversation, active_chat_room)
+    file_output, file_name = exporter.generate_file()
+    # MIME Type conditional
+    if export_format == "pdf":
+        mime_type = "application/pdf"
+    elif export_format == "txt":
+        mime_type = "text/plain"
+    elif export_format == "csv":
+        mime_type = "text/csv"
+
+    # Conditional for download button
+    if export_format == "pdf" or export_format == "txt" or export_format == "csv":
+        # Download button
+        st.download_button(
+            label=f"Save as .{export_format}",
+            data=file_output,  # Save to BytesIO or file
+            file_name=file_name,
+            mime=mime_type
+        )
+    
     st.divider()
     # Display EC2 Instance ID
     instance_id = get_instance_id()
@@ -432,7 +519,7 @@ if 'conversation_history' not in st.session_state:
 conversation_history = st.session_state['chat_rooms'][active_chat_room]
 
 # Chat input from the user
-user_input = st.chat_input(f"Ask Scientia Chatbot anything!")
+user_input = st.chat_input("Ask Scientia Chatbot anything!")
 
 # Call the chat manager to get a response from the AI
 if user_input:
