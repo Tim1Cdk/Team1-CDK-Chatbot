@@ -10,6 +10,8 @@ from fpdf import FPDF
 import csv
 from fpdf.enums import XPos, YPos
 from datetime import datetime
+import pytz
+from tzlocal import get_localzone
 from abc import ABC, abstractmethod
 import streamlit as st
 
@@ -89,7 +91,8 @@ class ConversationManager:
     def reset_conversation_history(self):
         self.conversation_history = [{"role": "system", "content": self.system_message}]
 
-class ConversationExporter(ABC): # Abstract base class for exporting conversation data in different formats
+# Abstract base class for exporting conversation data in different formats
+class ConversationExporter(ABC): 
     def __init__(self, conversation, chat_room_name):
          # Filter out messages that are not from the user or assistant
         self.conversation = [msg for msg in conversation if msg['role'] in ['user', 'assistant']] # Count only user and assistant messages with filter
@@ -109,10 +112,12 @@ class ConversationExporter(ABC): # Abstract base class for exporting conversatio
 
     def generate_file_name(self, extension):
         # Generate a unique file name with a timestamp and suitable extension
-        timestamp = datetime.now().strftime("%H-%M-%S--%d-%m-%Y")
+        local_tz = get_localzone()
+        timestamp = datetime.now(local_tz).strftime("%H-%M-%S--%d-%m-%Y")
         return f"Scientia-{self.chat_room_name}-{timestamp}.{extension}"
 
-class PDFExporter(ConversationExporter):  # Subclass to export data as a PDF file
+# Subclass to export data as a PDF file
+class PDFExporter(ConversationExporter):  
     def __init__(self, conversation, chat_room_name):
         super().__init__(conversation, chat_room_name)
         self.pdf = FPDF(orientation="P", unit="mm", format="A4")
@@ -128,7 +133,8 @@ class PDFExporter(ConversationExporter):  # Subclass to export data as a PDF fil
         self.pdf.image("media/logo.jpg", 170, 10, 30)
 
         # Saving Time
-        current_time = datetime.now().strftime("%H:%M:%S - %d/%m/%Y")
+        local_tz = get_localzone()
+        current_time = datetime.now(local_tz).strftime("%H:%M:%S - %d/%m/%Y")
         self.pdf.set_font('DejaVuSans', size=8)
         self.pdf.set_xy(10, 13)
         self.pdf.cell(0, 10, f"Saving Time: {current_time}", align='L')
@@ -177,11 +183,13 @@ class PDFExporter(ConversationExporter):  # Subclass to export data as a PDF fil
         pdf_output.seek(0) # Reset the stream pointer to the beginning of the byte stream
         return pdf_output, self.generate_file_name("pdf") # Return the  PDF data and generated file name
 
-class TXTExporter(ConversationExporter): # Subclass to export data as a TXT file
+# Subclass to export data as a TXT file
+class TXTExporter(ConversationExporter): 
     def generate_file(self):
         
         # Get the current timestamp
-        current_time = datetime.now().strftime("%H:%M:%S - %d/%m/%Y")
+        local_tz = get_localzone()
+        current_time = datetime.now(local_tz).strftime("%H:%M:%S - %d/%m/%Y")
         
         # Prepare conversation logs
         lines = [
@@ -206,7 +214,8 @@ class TXTExporter(ConversationExporter): # Subclass to export data as a TXT file
         file_name = self.generate_file_name("txt")
         return file_output, file_name
         
-class CSVExporter(ConversationExporter): # Subclass to export data as a CSV file
+# Subclass to export data as a CSV file        
+class CSVExporter(ConversationExporter): 
     def generate_file(self):
         # Prepare to store CSV data
         output = StringIO()
@@ -586,18 +595,17 @@ st.markdown(
 for message in conversation_history:
     # Hide initial messages and personality
     if message["role"] != "system":
-        # Adjust avatars size
-        avatar_image = (
-            img_to_html("media/avatar_chatbot.png", height=32) if message["role"] == "assistant" 
-            else img_to_html("media/avatar_user.png", height=32)
-        )
-        bubble_class = "bot" if message["role"] == "assistant" else "user"
-
-        # Adjust margin for both avatars
+        # Adjust avatar size, set bubble class and color for both roles
         if message["role"] == "user":
+            avatar_image = img_to_html("media/avatar_user.png", height=32)
             avatar_margin = "margin-left: 8px;"
+            bubble_color = '#87BEC7'
+            bubble_class = "user"
         else:
+            avatar_image = img_to_html("media/avatar_chatbot.png", height=32)
             avatar_margin = "margin-right: 8px;"
+            bubble_color = '#B9E5E8'
+            bubble_class = "bot"
 
         # Adjust styling of chat bubble and avatars
         st.markdown(
@@ -605,7 +613,7 @@ for message in conversation_history:
             <div class="chat-container" style="display: flex; margin-bottom: 32px;">
                 <div class="message-row {bubble_class}" style="display: flex; align-items: center;">
                     <div style="{avatar_margin}">{avatar_image}</div>
-                    <div class="chat-bubble {bubble_class}" style="background-color: {'#B9E5E8'}; padding: 16px; border-radius: 14px; max-width: 85%; word-wrap: break-word;">
+                    <div class="chat-bubble {bubble_class}" style="background-color: {bubble_color}; padding: 16px; border-radius: 14px; max-width: 85%; word-wrap: break-word;">
                         {message["content"]}
                     </div>
                 </div>
