@@ -10,8 +10,8 @@ from fpdf import FPDF
 import csv
 from fpdf.enums import XPos, YPos
 from datetime import datetime
-import pytz
-from tzlocal import get_localzone
+from pytz import timezone
+import json
 from abc import ABC, abstractmethod
 import streamlit as st
 
@@ -112,8 +112,8 @@ class ConversationExporter(ABC):
 
     def generate_file_name(self, extension):
         # Generate a unique file name with a timestamp and suitable extension
-        local_tz = get_localzone()
-        timestamp = datetime.now(local_tz).strftime("%H-%M-%S--%d-%m-%Y")
+        wib = timezone('Asia/Jakarta')
+        timestamp = datetime.now(wib).strftime("%H-%M-%S--%d-%m-%Y")
         return f"Scientia-{self.chat_room_name}-{timestamp}.{extension}"
 
 # Subclass to export data as a PDF file
@@ -133,8 +133,8 @@ class PDFExporter(ConversationExporter):
         self.pdf.image("media/logo.jpg", 170, 10, 30)
 
         # Saving Time
-        local_tz = get_localzone()
-        current_time = datetime.now(local_tz).strftime("%H:%M:%S - %d/%m/%Y")
+        wib = timezone('Asia/Jakarta')
+        current_time = datetime.now(wib).strftime("%H:%M:%S -- %d/%m/%Y (GMT+7/WIB)")
         self.pdf.set_font('DejaVuSans', size=8)
         self.pdf.set_xy(10, 13)
         self.pdf.cell(0, 10, f"Saving Time: {current_time}", align='L')
@@ -188,8 +188,8 @@ class TXTExporter(ConversationExporter):
     def generate_file(self):
         
         # Get the current timestamp
-        local_tz = get_localzone()
-        current_time = datetime.now(local_tz).strftime("%H:%M:%S - %d/%m/%Y")
+        wib = timezone('Asia/Jakarta')
+        current_time = datetime.now(wib).strftime("%H:%M:%S -- %d/%m/%Y (GMT+7/WIB)")
         
         # Prepare conversation logs
         lines = [
@@ -213,6 +213,38 @@ class TXTExporter(ConversationExporter):
         # Generate the file name, then return file
         file_name = self.generate_file_name("txt")
         return file_output, file_name
+
+# Subclass to export data as a CSV file    
+class JSONExporter(ConversationExporter):
+    def generate_file(self):
+        
+        # Get the current timestamp
+        wib = timezone('Asia/Jakarta')
+        current_time = datetime.now(wib).strftime("%H:%M:%S -- %d/%m/%Y (GMT+7/WIB)")
+
+        # Create JSON structure
+        data = {
+            "chat_room_name": self.chat_room_name,
+            "metadata": {
+                "number_of_messages": self.total_messages,
+                "number_of_words": self.total_words,
+                "number_of_characters": self.total_characters,
+                "saving_time": current_time
+            },
+            "conversation": [
+                {
+                    "role": "Chatbot" if msg['role'] == 'assistant' else "User",
+                    "content": msg['content']
+                }
+                for msg in self.conversation
+            ]
+        }
+
+        # Convert to JSON and write to a BytesIO object
+        json_output = BytesIO()
+        json_output.write(json.dumps(data, indent=4).encode('utf-8'))
+        json_output.seek(0)  # Reset the pointer to the start of the file
+        return json_output, self.generate_file_name("json")    
         
 # Subclass to export data as a CSV file        
 class CSVExporter(ConversationExporter): 
@@ -504,13 +536,14 @@ with st.sidebar:
     exporter_classes = {
         "pdf": PDFExporter,
         "txt": TXTExporter,
+        "json": JSONExporter,
         "csv": CSVExporter
     }
 
     # Selectbox to choose format
     export_format = st.selectbox(
         "Choose a file format:",
-        options=["pdf", "txt","csv"],
+        options=["pdf", "txt","json","csv"],
         index=0
     )
 
@@ -525,11 +558,13 @@ with st.sidebar:
         mime_type = "application/pdf"
     elif export_format == "txt":
         mime_type = "text/plain"
+    elif export_format == "json":
+        mime_type = "application/json"
     elif export_format == "csv":
         mime_type = "text/csv"
 
     # Conditional for download button
-    if export_format == "pdf" or export_format == "txt" or export_format == "csv":
+    if export_format == "pdf" or export_format == "txt" or export_format == "json" or export_format == "csv":
         # Download button
         st.download_button(
             label=f"Save as .{export_format}",
