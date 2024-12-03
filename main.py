@@ -21,10 +21,13 @@ DEFAULT_BASE_URL = "https://api.together.xyz/v1"
 DEFAULT_MODEL = "meta-llama/Llama-Vision-Free"
 DEFAULT_TEMPERATURE = 0.7
 DEFAULT_MAX_TOKENS = 512
-DEFAULT_TOKEN_BUDGET = 4096
+DEFAULT_TOKEN_BUDGET = 8184
+DEFAULT_TOP_P = 0.7
+DEFAULT_FREQUENCY_PENALTY = 0.0
+DEFAULT_PRESENCE_PENALTY = 0.0
 
 class ConversationManager:
-    def __init__(self, api_key=None, base_url=None, model=None, temperature=None, max_tokens=None, token_budget=None):
+    def __init__(self, api_key=None, base_url=None, model=None, temperature=None, max_tokens=None, token_budget=None, top_p=None, frequency_penalty=None, presence_penalty=None):
         if not api_key:
             api_key = DEFAULT_API_KEY
         if not base_url:
@@ -36,6 +39,9 @@ class ConversationManager:
         self.temperature = temperature if temperature else DEFAULT_TEMPERATURE
         self.max_tokens = max_tokens if max_tokens else DEFAULT_MAX_TOKENS
         self.token_budget = token_budget if token_budget else DEFAULT_TOKEN_BUDGET
+        self.top_p = top_p if top_p else DEFAULT_TOP_P
+        self.frequency_penalty = frequency_penalty if frequency_penalty else DEFAULT_FREQUENCY_PENALTY
+        self.presence_penalty = presence_penalty if presence_penalty else DEFAULT_PRESENCE_PENALTY
 
         self.system_message = PERSONALITIES["Bona Fide Scientia 🤓"]["message"]  # Bona Fide Scientia as the default personality
         self.conversation_history = [{"role": "system", "content": self.system_message}]
@@ -64,10 +70,13 @@ class ConversationManager:
         except Exception as e:
             print(f"Error enforcing token budget: {e}")
 
-    def chat_completion(self, prompt, temperature=None, max_tokens=None, model=None):
+    def chat_completion(self, prompt, temperature=None, max_tokens=None, model=None, top_p=None, frequency_penalty=None, presence_penalty=None):
         temperature = temperature if temperature is not None else self.temperature
         max_tokens = max_tokens if max_tokens is not None else self.max_tokens
         model = model if model is not None else self.model
+        top_p = top_p if top_p is not None else self.top_p
+        frequency_penalty = frequency_penalty if frequency_penalty is not None else self.frequency_penalty
+        presence_penalty = presence_penalty if presence_penalty is not None else self.presence_penalty        
 
         self.conversation_history.append({"role": "user", "content": prompt})
         self.enforce_token_budget()
@@ -78,6 +87,9 @@ class ConversationManager:
                 messages=self.conversation_history,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                top_p=top_p,
+                frequency_penalty=frequency_penalty,
+                presence_penalty=presence_penalty
             )
         except Exception as e:
             print(f"Error generating response: {e}")
@@ -495,35 +507,88 @@ with st.sidebar:
     # Chatbot Configuration Section
     st.subheader("Chatbot Configuration ⚙️")
         
+    show_advanced = st.toggle("Show advanced configuration", value=False) # Toggle button to show/hide advanced configuration     
     # Slider for Max Tokens
     max_tokens = st.slider(
         label="**Max Tokens Per Message**",
         min_value=10,
-        max_value=512,
+        max_value=2048,
         value=chat_manager.max_tokens,
         step=10
     )
-
+    st.caption("Controls the length of the response. A higher number gives longer replies, while a lower number gives shorter ones. Default is 512.")
+    
     # Slider for Temperature
     temperature = st.slider(
         label="**Temperature**",
         min_value=0.00,
-        max_value=1.00,
+        max_value=2.00,
         value=chat_manager.temperature,
         step=0.01
     )
+    st.caption("Makes the answers more or less creative. A lower value gives more predictable answers, while a higher value makes them more varied. Default is 0.70.")
 
+    # Initialize default values
+    top_p = chat_manager.top_p
+    frequency_penalty = chat_manager.frequency_penalty
+    presence_penalty = chat_manager.presence_penalty
+    
+    # Conditional advanced configuration
+    if show_advanced: 
+        # Slider for Top_P
+        top_p = st.slider(
+            label="**Top_P**",
+            min_value=0.00,
+            max_value=2.00,
+            value=chat_manager.top_p,
+            step=0.01
+        )
+        st.caption("Affects how the chatbot chooses words. Higher values let it choose from a wider range of words, while lower values narrow the choices. Default is 0.70.")
+
+        # Slider for Frequency Penalty
+        frequency_penalty = st.slider(
+            label="**Frequency Penalty**",
+            min_value=0.00,
+            max_value=2.00,
+            value=chat_manager.frequency_penalty,
+            step=0.01
+        )
+        st.caption("Reduces repetition in the response. A higher value makes the chatbot less likely to repeat words or phrases. Default is 0.00.")
+
+        # Slider for Presence Penalty
+        presence_penalty = st.slider(
+            label="**Presence Penalty**",
+            min_value=0.00,
+            max_value=2.00,
+            value=chat_manager.presence_penalty,
+            step=0.01
+        )
+        st.caption("Encourages the chatbot to bring in new ideas, reducing the chance of repeating the same concepts. Default is 0.00.")
+        
     # Show warning when slider value changes but not yet applied
-    if max_tokens != chat_manager.max_tokens or temperature != chat_manager.temperature:
+    if (
+        max_tokens != chat_manager.max_tokens or 
+        temperature != chat_manager.temperature or 
+        top_p != chat_manager.top_p or 
+        frequency_penalty != chat_manager.frequency_penalty or 
+        presence_penalty != chat_manager.presence_penalty
+    ):
         st.warning("Changes not yet saved! Click 'Apply changes' to save.")
 
     # Button to apply chatbot changes
     if st.button("Apply changes"):
         chat_manager.temperature = temperature
         chat_manager.max_tokens = max_tokens
+        chat_manager.top_p = top_p
+        chat_manager.frequency_penalty = frequency_penalty
+        chat_manager.presence_penalty = presence_penalty 
         st.success("Changes applied successfully!")
         st.write(f"Temperature set to: {temperature}")
         st.write(f"Max Tokens set to: {max_tokens}")
+        if show_advanced:
+            st.write(f"Top_P set to: {top_p}")
+            st.write(f"Frequency Penalty set to: {frequency_penalty}")
+            st.write(f"Presence Penalty set to: {presence_penalty}")
         
     st.markdown("<br><br>", unsafe_allow_html=True)
     
